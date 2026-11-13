@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Prototipe sistem untuk meneliti klasifikasi gambar anime buatan manusia dan hasil generatif AI.">
+  <title>Anime AI Detector</title>
+  <link rel="stylesheet" href="/public/css/style.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#beranda" aria-label="Anime AI Detector - Beranda">
+      <span class="brand-icon" aria-hidden="true">✦</span>
+      <span>Anime<span class="brand-accent">AI</span> Detector</span>
+    </a>
+    <nav class="main-nav" aria-label="Navigasi utama">
+      <a class="active" href="#beranda">Beranda</a>
+      <a href="#deteksi">Deteksi</a>
+      <a href="#riwayat">Riwayat</a>
+      <a href="#tentang">Tentang</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="beranda">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-dot"></span> PROTOTIPE PENELITIAN</p>
+        <h1>Kenali asal gambar anime dengan bantuan <span>Machine Learning.</span></h1>
+        <p class="hero-description">
+          Sistem ini dirancang untuk memprediksi apakah gambar anime merupakan karya manusia
+          atau hasil generatif AI. Unggah gambar untuk mendapatkan prediksi dari model klasifikasi yang sudah dilatih.
+        </p>
+        <a class="primary-link" href="#deteksi">Coba unggah gambar <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-one"></div>
+        <div class="orbit orbit-two"></div>
+        <div class="art-card art-card-back"><span>IMAGE</span><strong>01</strong></div>
+        <div class="art-card art-card-front">
+          <div class="art-spark">✦</div>
+          <div class="art-lines"><i></i><i></i><i></i></div>
+          <span>AI IMAGE ANALYSIS</span>
+        </div>
+        <div class="floating-chip">HUMAN <b>↔</b> AI</div>
+      </div>
+    </section>
+
+    <section class="workspace" id="deteksi">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">IMAGE CHECK</p>
+          <h2>Unggah gambar anime</h2>
+          <p class="section-description">Pilih satu gambar anime. Model akan memprediksi apakah gambar dibuat manusia atau dihasilkan AI.</p>
+        </div>
+        <span class="step-label">LANGKAH 01 / 02</span>
+      </div>
+
+      <div class="workspace-grid">
+        <section class="upload-panel" aria-label="Form unggah gambar">
+          <input id="imageInput" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" hidden>
+          <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="Pilih atau jatuhkan gambar di sini">
+            <div class="upload-icon" aria-hidden="true">↑</div>
+            <h3>Letakkan gambar di sini</h3>
+            <p>atau pilih file dari perangkatmu</p>
+            <button class="secondary-button" id="chooseButton" type="button">Pilih gambar</button>
+            <span class="file-hint">JPG, JPEG, PNG, WEBP · Maksimal 4 MB</span>
+          </div>
+          <div class="selected-file" id="selectedFile" hidden>
+            <div class="file-symbol" aria-hidden="true">▧</div>
+            <div class="file-details">
+              <strong id="fileName">nama-gambar.png</strong>
+              <span id="fileMeta">Menunggu pemeriksaan</span>
+            </div>
+            <button class="remove-button" id="removeButton" type="button" aria-label="Hapus gambar">×</button>
+          </div>
+          <button class="primary-button" id="validateButton" type="button" disabled>Prediksi gambar</button>
+          <p class="privacy-note">Gambar diproses oleh model klasifikasi. Hasilnya berupa prediksi, bukan kepastian asal-usul gambar.</p>
+        </section>
+
+        <section class="preview-panel" aria-label="Pratinjau gambar dan status">
+          <div class="panel-topline"><span>PRATINJAU</span><span class="live-indicator">● LOCAL PREVIEW</span></div>
+          <div class="preview-area" id="previewArea">
+            <div class="preview-placeholder" id="previewPlaceholder">
+              <div class="placeholder-icon">▧</div>
+              <span>Pratinjau gambar akan muncul di sini</span>
+            </div>
+            <img id="imagePreview" alt="Pratinjau gambar yang dipilih" hidden>
+          </div>
+          <div class="status-box" id="statusBox" role="status" aria-live="polite">
+            <span class="status-mark">i</span>
+            <p id="statusText">Pilih gambar, lalu tekan “Prediksi gambar”.</p>
+          </div>
+          <div class="prediction-result" id="predictionResult" hidden aria-live="polite">
+            <div class="result-heading">HASIL PREDIKSI</div>
+            <strong class="result-label" id="predictionLabel">-</strong>
+            <div class="result-score-row"><span>Skor model</span><strong id="predictionConfidence">-</strong></div>
+            <div class="score-track"><span id="scoreBar"></span></div>
+            <p class="result-note" id="predictionNote">Skor softmax bukan kepastian asal-usul gambar.</p>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="history-section" id="riwayat">
+      <div class="section-heading history-heading">
+        <div>
+          <p class="eyebrow">ANALYSIS HISTORY</p>
+          <h2>Riwayat deteksi</h2>
+          <p class="section-description">Riwayat tersimpan pada browser ini tanpa perlu membuat akun atau login.</p>
+        </div>
+        <div class="history-actions">
+          <button class="secondary-button" id="refreshHistoryButton" type="button">Muat ulang</button>
+          <button class="remove-history-button" id="clearHistoryButton" type="button" disabled>Hapus semua</button>
+        </div>
+      </div>
+      <p class="history-status" id="historyStatus" role="status" aria-live="polite">Memuat riwayat...</p>
+      <div class="history-loading" id="historyLoading" hidden>Memuat riwayat analisis...</div>
+      <div class="history-empty" id="historyEmpty" hidden>
+        <div class="placeholder-icon">▤</div>
+        <strong>Belum ada riwayat deteksi</strong>
+        <span>Hasil analisis yang berhasil akan muncul di sini.</span>
+        <a class="primary-link" href="#deteksi">Mulai deteksi <span aria-hidden="true">↑</span></a>
+      </div>
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+    <section class="about-section" id="tentang">
+      <div>
+        <p class="eyebrow">TENTANG PROYEK</p>
+        <h2>Prototipe yang dikembangkan bertahap.</h2>
+      </div>
+      <p>
+        Tujuan penelitian ini adalah menguji model klasifikasi citra untuk memprediksi apakah gambar
+        anime merupakan karya manusia atau hasil generatif AI. Hasil sistem merupakan prediksi
+        berdasarkan pola yang dipelajari model dan bukan bukti mutlak asal-usul gambar.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>Anime AI Detector · Prototipe pengembangan</span>
+    <span>Hasil bergantung pada model yang sudah dilatih</span>
+  </footer>
+
+  <script src="/public/js/script.js"></script>
+</body>
+</html>
