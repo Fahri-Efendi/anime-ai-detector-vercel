@@ -1,92 +1,88 @@
-"""Lazy-loaded MobileNetV3-Small inference service.
+"""ONNX Runtime inference service for Anime AI Detector.
 
-The trained checkpoint is created by training/colab_training.ipynb and should be
-copied to models/best_model.pth. No prediction is fabricated when the checkpoint
-is missing.
+Uses the exported MobileNetV3-Small checkpoint at models/best_model.onnx.
+Preprocessing and class mapping must stay aligned with the Colab training notebook:
+AI-generated = 0, Human = 1; RGB; square padding to 224x224; ImageNet normalization.
 """
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 from PIL import Image, ImageOps
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BASE_DIR / "models" / "best_model.pth"
+MODEL_PATH = BASE_DIR / "models" / "best_model.onnx"
 IMAGE_SIZE = 224
-IMAGENET_MEAN = (0.485, 0.456, 0.406)
-IMAGENET_STD = (0.229, 0.224, 0.225)
+IMAGENET_MEAN = np.asarray((0.485, 0.456, 0.406), dtype=np.float32).reshape(1, 3, 1, 1)
+IMAGENET_STD = np.asarray((0.229, 0.224, 0.225), dtype=np.float32).reshape(1, 3, 1, 1)
+CLASS_TO_IDX = {"ai": 0, "human": 1}
 
-_model = None
-_class_to_idx: dict[str, int] | None = None
-_torch = None
+_session = None
+_input_name: str | None = None
+_output_name: str | None = None
 
 
 class ModelNotReadyError(RuntimeError):
-    """Raised when no trained model checkpoint is available."""
-
-
-def _build_model():
-    try:
-        import torch.nn as nn
-        from torchvision import models
-    except ImportError as exc:
-        raise RuntimeError(
-            "Library ML belum terpasang. Jalankan: pip install -r requirements.txt"
-        ) from exc
-
-    model = models.mobilenet_v3_small(weights=None)
-    last_layer = model.classifier[3]
-    model.classifier[3] = nn.Linear(last_layer.in_features, 2)
-    return model
+    """Raised when the exported ONNX model is not available."""
 
 
 def load_model():
-    """Load the trained model once and cache it in memory for later requests."""
-    global _model, _class_to_idx, _torch
+    """Load ONNX Runtime session once and reuse it across requests."""
+    global _session, _input_name, _output_name
 
-    if _model is not None:
-        return _model, _class_to_idx
+    if _session is not None:
+        return _session
 
     if not MODEL_PATH.is_file():
         raise ModelNotReadyError(
-            "Model belum tersedia. Latih model melalui training/colab_training.ipynb, "
-            "lalu letakkan best_model.pth ke folder models."
+            "Model ONNX belum tersedia. Letakkan best_model.onnx di folder models."
         )
 
     try:
-        import torch
+        import onnxruntime as ort
     except ImportError as exc:
         raise RuntimeError(
-            "PyTorch belum terpasang. Jalankan: pip install -r requirements.txt"
+            "ONNX Runtime belum terpasang. Jalankan: pip install -r requirements.txt"
         ) from exc
 
-    checkpoint = torch.load(MODEL_PATH, map_location="cpu", weights_only=True)
-    if checkpoint.get("architecture") != "mobilenet_v3_small":
-        raise RuntimeError("Arsitektur model pada checkpoint tidak dikenali.")
+    options = ort.SessionOptions()
+    options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    # Conservative setting for small servers and laptop testing.
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
 
-    class_to_idx = checkpoint.get("class_to_idx")
-    if class_to_idx != {"ai": 0, "human": 1}:
-        raise RuntimeError(
-            "Urutan kelas checkpoint tidak sesuai. Seharusnya {'ai': 0, 'human': 1}. "
-            "Periksa folder dataset dan notebook training."
+    try:
+        session = ort.InferenceSession(
+            str(MODEL_PATH),
+            sess_options=options,
+            providers=["CPUExecutionProvider"],
         )
+    except Exception as exc:
+        raise RuntimeError(f"Model ONNX gagal dimuat: {exc}") from exc
 
-    model = _build_model()
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.eval()
+    inputs = session.get_inputs()
+    outputs = session.get_outputs()
+    if len(inputs) != 1 or len(outputs) != 1:
+        raise RuntimeError("Model ONNX harus memiliki satu input dan satu output.")
 
-    _model = model
-    _class_to_idx = class_to_idx
-    _torch = torch
-    return _model, _class_to_idx
+    input_shape = inputs[0].shape
+    output_shape = outputs[0].shape
+    if len(input_shape) != 4:
+        raise RuntimeError(f"Bentuk input ONNX tidak sesuai: {input_shape}")
+    if len(output_shape) != 2 or output_shape[-1] != 2:
+        raise RuntimeError(f"Bentuk output ONNX tidak sesuai untuk 2 kelas: {output_shape}")
+
+    _session = session
+    _input_name = inputs[0].name
+    _output_name = outputs[0].name
+    return _session
 
 
-def _preprocess(image: Image.Image):
-    """Match the preprocessing used in the Colab notebook; preserve aspect ratio."""
-    import numpy as np
-
-    # Pad to square instead of stretching/cropping the artwork.
+def _preprocess(image: Image.Image) -> np.ndarray:
+    """Match the evaluation preprocessing used by the Colab notebook."""
     resampling = getattr(Image, "Resampling", Image).BICUBIC
     square = ImageOps.pad(
         image.convert("RGB"),
@@ -95,34 +91,40 @@ def _preprocess(image: Image.Image):
         color=(127, 127, 127),
         centering=(0.5, 0.5),
     )
-    array = np.asarray(square, dtype=np.float32) / 255.0
-    tensor = _torch.from_numpy(array).permute(2, 0, 1)
-    mean = _torch.tensor(IMAGENET_MEAN, dtype=tensor.dtype).view(3, 1, 1)
-    std = _torch.tensor(IMAGENET_STD, dtype=tensor.dtype).view(3, 1, 1)
-    return ((tensor - mean) / std).unsqueeze(0)
+
+    array = np.asarray(square, dtype=np.float32) / 255.0  # HWC, RGB, [0, 1]
+    array = np.transpose(array, (2, 0, 1))[None, ...]  # NCHW: [1, 3, 224, 224]
+    array = (array - IMAGENET_MEAN) / IMAGENET_STD
+    return np.ascontiguousarray(array, dtype=np.float32)
 
 
 def predict_image(image: Image.Image) -> dict[str, Any]:
-    """Return a model prediction and softmax scores for a PIL image."""
-    model, class_to_idx = load_model()
+    """Return the same response structure as the previous PyTorch service."""
+    session = load_model()
     tensor = _preprocess(image)
 
-    with _torch.inference_mode():
-        logits = model(tensor)
-        probabilities = _torch.softmax(logits, dim=1)[0]
+    logits = session.run([_output_name], {_input_name: tensor})[0]
+    logits = np.asarray(logits, dtype=np.float32)
+    if logits.shape != (1, 2):
+        raise RuntimeError(f"Output model tidak sesuai: {logits.shape}")
 
-    index_to_class = {index: name for name, index in class_to_idx.items()}
-    predicted_index = int(probabilities.argmax().item())
+    # Stable softmax over the two output logits.
+    shifted = logits[0] - np.max(logits[0])
+    exp_values = np.exp(shifted)
+    probabilities = exp_values / np.sum(exp_values)
+
+    index_to_class = {0: "ai", 1: "human"}
+    predicted_index = int(np.argmax(probabilities))
     predicted_class = index_to_class[predicted_index]
     display_label = "AI-generated" if predicted_class == "ai" else "Human"
 
     return {
         "predicted_label": display_label,
         "predicted_class": predicted_class,
-        "confidence": float(probabilities[predicted_index].item()),
+        "confidence": float(probabilities[predicted_index]),
         "scores": {
-            "AI-generated": float(probabilities[class_to_idx["ai"]].item()),
-            "Human": float(probabilities[class_to_idx["human"]].item()),
+            "AI-generated": float(probabilities[CLASS_TO_IDX["ai"]]),
+            "Human": float(probabilities[CLASS_TO_IDX["human"]]),
         },
         "score_note": "Skor softmax model, bukan kepastian asal-usul gambar.",
     }

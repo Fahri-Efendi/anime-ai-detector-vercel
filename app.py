@@ -29,8 +29,8 @@ if not SECRET_KEY:
 # Folder public digunakan agar URL aset (/css/... dan /js/...) cocok untuk Vercel.
 app = Flask(
     __name__,
-    static_folder=str(BASE_DIR / "public"),
-    static_url_path="",
+    static_folder="public",
+    static_url_path=""
 )
 app.secret_key = SECRET_KEY
 app.config.update(
