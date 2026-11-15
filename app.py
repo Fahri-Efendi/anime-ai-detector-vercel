@@ -13,31 +13,36 @@ from PIL import Image, UnidentifiedImageError
 
 from ml_service import ModelNotReadyError, predict_image
 
+
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 SECRET_KEY = os.getenv("SECRET_KEY", "").strip()
-IS_PRODUCTION = os.getenv("VERCEL") == "1" or os.getenv("APP_ENV", "").lower() == "production"
 
+IS_VERCEL = os.getenv("VERCEL") == "1"
+IS_PRODUCTION = IS_VERCEL or os.getenv("APP_ENV", "").lower() == "production"
+
+# Buat instance Flask pada level utama agar terdeteksi Vercel.
+STATIC_FOLDER = None if IS_VERCEL else "public"
+STATIC_URL_PATH = None if IS_VERCEL else ""
+
+app = Flask(
+    __name__,
+    static_folder=STATIC_FOLDER,
+    static_url_path=STATIC_URL_PATH
+)
+
+# SECRET_KEY wajib tersedia untuk session pengunjung.
 if not SECRET_KEY:
     raise RuntimeError(
-        "SECRET_KEY belum diatur. Buat file .env di folder utama project "
-        "dan isi SECRET_KEY, atau atur Environment Variable di hosting."
+        "SECRET_KEY belum diatur pada environment."
     )
 
-# Folder public digunakan agar URL aset (/css/... dan /js/...) cocok untuk Vercel.
-if os.getenv("VERCEL") == "1":
-    app = Flask(__name__, static_folder=None)
-else:
-    app = Flask(
-        __name__,
-        static_folder="public",
-        static_url_path=""
-    )
 app.secret_key = SECRET_KEY
+
 app.config.update(
-    MAX_CONTENT_LENGTH=4 * 1024 * 1024,  # 4 MB agar sesuai batas request Vercel.
+    MAX_CONTENT_LENGTH=4 * 1024 * 1024,
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=IS_PRODUCTION,
