@@ -1,8 +1,13 @@
-.env
 .venv/
 __pycache__/
-*.py[cod]
+*.pyc
+.env
 *.db
 *.sqlite
-*.sqlite3
-.ipynb_checkpoints/
+
+training/
+datasets/
+anime_ai_dataset/
+*.ipynb
+
+models/*.pth

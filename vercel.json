@@ -1,0 +1,9 @@
+
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app.py": {
+      "excludeFiles": "{.venv/**,training/**,tests/**,datasets/**,anime_ai_dataset/**,data/**,**/*.ipynb,models/*.pth,static/**}"
+    }
+  }
+}

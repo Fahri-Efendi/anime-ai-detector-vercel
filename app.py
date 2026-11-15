@@ -27,11 +27,14 @@ if not SECRET_KEY:
     )
 
 # Folder public digunakan agar URL aset (/css/... dan /js/...) cocok untuk Vercel.
-app = Flask(
-    __name__,
-    static_folder="public",
-    static_url_path=""
-)
+if os.getenv("VERCEL") == "1":
+    app = Flask(__name__, static_folder=None)
+else:
+    app = Flask(
+        __name__,
+        static_folder="public",
+        static_url_path=""
+    )
 app.secret_key = SECRET_KEY
 app.config.update(
     MAX_CONTENT_LENGTH=4 * 1024 * 1024,  # 4 MB agar sesuai batas request Vercel.
