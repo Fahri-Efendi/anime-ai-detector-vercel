@@ -1,0 +1,12 @@
+@'
+.venv/
+venv/
+training/
+tests/
+datasets/
+anime_ai_dataset/
+data/
+**/*.ipynb
+models/*.pth
+static/
+'@ | Set-Content -Path .\.vercelignore -Encoding utf8
